@@ -1,3 +1,10 @@
+-- Warning: in order to work, the library need a "disk" object, which must provide this functions:
+-- disk:read(address, [size]): read [size] bytes from <address>
+-- disk:write(address, data): write <data> on the disk from the address <address>
+-- disk:flush(): save the changes on the disk, if some cache is used
+-- 
+-- <address> is a value from 0 to sizeOfTheDisk-1
+
 ---
 -- FAT16 support
 -- FAT16 support for Lunux
@@ -53,7 +60,7 @@ end
 -- 
 -- @function parseBPB
 -- @param #disk disk Disk to extract from
--- @return #fatBPB
+-- @return #fatBPB the disk's BPB
 local function parseBPB(disk)
   local raw = disk:read(0, 512)
   if #raw ~= 512 then return nil, "Disk smaller than 512 bytes." end
@@ -85,7 +92,15 @@ local function parseBPB(disk)
   return BPB
 end
 
---range: 2 to n
+---
+-- FAT interface
+-- Return the value of a FAT entry from it's index
+-- 
+-- @function searchClusterInFAT
+-- @param #disk disk Disk to search from
+-- @param #fatBPB BPB FAT Infos
+-- @param #number index Index of the entry
+-- @return #number Value in the entry
 local function searchClusterInFAT(disk, BPB, index)
   if (index < 0) or (index > (BPB.fatSize*BPB.sectorSize/2)) then return nil, "Index out of range" end
   local offset = ((BPB.reservedSectors * BPB.sectorSize))
