@@ -343,6 +343,4 @@ function mod.umount(partition)
   partition = {disk=partition.disk}
 end
 
-mod.resolvePath = resolvePath
-
 return mod
