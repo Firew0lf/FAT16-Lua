@@ -254,15 +254,12 @@ local function getFileBytes(file, size, stop) --start from file.seek
   local buff = ""
   local clusterSize = (file.partition.BPB.clusterSize * file.partition.BPB.sectorSize)
   
-  local zeros = 0
-  
   for i=1, size do
     local clusterIndex = math.ceil(file.aseek/clusterSize)
     local cluster = file.clusters[clusterIndex]-2
     local addr = offset+((clusterSize*cluster)+(file.aseek%clusterSize))
     buff = (buff..file.partition.disk:read(addr, 1))
-    if buff:sub(-1,-1):byte() == 0 then zeros = zeros + 1 end
-    if stop and buff:sub(-1, -1):match(stop) then break end
+    if stop and (buff:sub(-1, -1)):match(stop) then break end
     file.aseek = (file.aseek+1)
   end
   return buff
@@ -283,9 +280,9 @@ function mod.open(partition, path, mode)
     elseif pattern == "*a" then
       return getFileBytes(self, (self.size-self.aseek))
     elseif pattern == "*l" then
-      return getFileBytes(self, self.size, "\n"):sub(1, -2)
+      return getFileBytes(self, (self.size-self.aseek), "\n"):sub(1, -2)
     elseif pattern == "*n" then
-      return getFileBytes(self, self.size, "[^%d]"):sub(1, -2)
+      return getFileBytes(self, (self.size-self.aseek), "[^%d]"):sub(1, -2)
     else
       return nil, "Bad pattern"
     end
