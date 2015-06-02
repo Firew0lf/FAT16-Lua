@@ -281,6 +281,8 @@ function mod.open(partition, path, mode)
       return getFileBytes(self, (self.size-self.aseek))
     elseif pattern == "*l" then
       return getFileBytes(self, (self.size-self.aseek), "\n")
+    elseif pattern == "*L" then
+      return (getFileBytes(self, (self.size-self.aseek), "\n").."\n")
     elseif pattern == "*n" then
       getFileBytes(self, (self.size-self.aseek), "[%d]")
       return getFileBytes(self, (self.size-self.aseek), "[^%d]")
