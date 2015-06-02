@@ -250,24 +250,21 @@ end
 local function getFileBytes(file, size, stop) --start from file.seek
   if file.aseek >= file.size then return nil, "End of file" end
   if (file.aseek + size) > file.size then size = (size-(file.size-file.aseek)) end
-  local offset =  (file.partition.BPB.sectorSize*((file.partition.BPB.fatSize*file.partition.BPB.fatNumber)+file.partition.BPB.reservedSectors))
+  local offset =  (file.partition.BPB.sectorSize*((file.partition.BPB.fatSize*file.partition.BPB.fatNumber)+file.partition.BPB.reservedSectors))+(file.partition.BPB.rootEntriesNumber*32)
   local buff = ""
-  for i=1, #file.clusters do print("getFileBytes", "clusters: ", file.clusters[i]) end
   local clusterSize = (file.partition.BPB.clusterSize * file.partition.BPB.sectorSize)
   
   local zeros = 0
   
   for i=1, size do
     local clusterIndex = math.ceil(file.aseek/clusterSize)
-    local cluster = file.clusters[clusterIndex]
+    local cluster = file.clusters[clusterIndex]-2
     local addr = offset+((clusterSize*cluster)+(file.aseek%clusterSize))
     buff = (buff..file.partition.disk:read(addr, 1))
     if buff:sub(-1,-1):byte() == 0 then zeros = zeros + 1 end
     if stop and buff:sub(-1, -1):match(stop) then break end
     file.aseek = (file.aseek+1)
   end
-  print(zeros, "zeros")
-  for i=1, #buff do io.write(buff:sub(i, i):byte().."|") end
   return buff
 end
 
@@ -276,7 +273,6 @@ end
 function mod.open(partition, path, mode)
   local name, details = resolvePath(partition, path)
   if not name then return nil, details end
-  for n,v in pairs(details) do print("", n ,v) end
   local clusters = listFileClusters(partition, details.firstCluster)
   
   local file = {partition=partition, path=path, mode=mode, aseek=1, vbuff="full", buff="", clusters=clusters, size=details.size}
