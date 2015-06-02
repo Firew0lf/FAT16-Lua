@@ -107,6 +107,14 @@ local function searchClusterInFAT(disk, BPB, index)
   return bytesToNumber(disk:read(offset+(index*2), 2))
 end
 
+---
+-- Clusters lister
+-- List all the clusters in a file
+-- 
+-- @function listFileClusters
+-- @param #fatPartition partition Partition where the file is stored
+-- @param #fatClusterIndex start First cluster of the file
+-- @return cluster list
 local function listFileClusters(partition, start)
   local clusters = {[1] = start}
   while clusters[#clusters] <= 0xFFEF do
@@ -121,6 +129,15 @@ local function listFileClusters(partition, start)
   return clusters
 end
 
+---
+-- Get a cluster
+-- Get data from a cluster on the FAT
+-- 
+-- @function getCluster
+-- @param #disk disk Disk
+-- @param #fatBPB BPB Disk's BPB
+-- @param #fatClusterIndex index Cluster to get
+-- @return #string Cluster data
 local function getCluster(disk, BPB, index)
   index = (index - 1)
   local offset = ((BPB.fatSize * BPB.sectorSize * BPB.fatNumber) + (BPB.rootEntriesNumber * 32)) --should be good
@@ -235,7 +252,7 @@ local function getFileBytes(file, size, stop) --start from file.seek
   if (file.aseek + size) > file.size then size = (size-(file.size-file.aseek)) end
   local offset =  (file.partition.BPB.sectorSize*((file.partition.BPB.fatSize*file.partition.BPB.fatNumber)+file.partition.BPB.reservedSectors))
   local buff = ""
-  for i=1, #file.clusters do print(file.clusters[i]) end
+  for i=1, #file.clusters do print("getFileBytes", "clusters: ", file.clusters[i]) end
   local clusterSize = (file.partition.BPB.clusterSize * file.partition.BPB.sectorSize)
   
   local zeros = 0
@@ -329,6 +346,7 @@ function mod.tmpname(self)
 end
 
 function mod.mount(self, disk)
+  if self.disk then return nil, "Already mounted" end
   local BPB, err = parseBPB(disk)
   if err then return err end
   local partition = {disk=disk, BPB=BPB, err=err}
