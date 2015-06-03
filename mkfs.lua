@@ -15,7 +15,6 @@ local function numberToBytes(num, size)
   for i=1, #hex, 2 do
     str = (str..string.char(tonumber(hex:sub(i,i+1), 16)))
   end
-  print(num.." -> "..hex..": ", table.unpack(table.pack(str:byte())))
   return str
 end
 
@@ -111,14 +110,11 @@ device:close()
 device = io.open(arg[#arg], "w+b")
 --Let the fun begin
 local sectorNumber = (size/sectorSize)
-print(sectorNumber.." sectors in total")
 local twoBytesSectors = ((sectorNumber < 65536 and sectorNumber) or 0)
 local fourBytesSectors = ((twoBytesSectors == 0 and sectorNumber) or 0)
 local hiddenSectors = 0
 local clusterNumber = size/(clusterSize*sectorSize)
-print(clusterNumber.." clusters in total")
 local FATSize = (clusterNumber * 2 / sectorSize)
-print(FATSize.." clusters for FAT")
 
 while #code < 448 do code = (code.."\0") end
 while #name < 11 do name = (name.." ") end

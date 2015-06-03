@@ -54,6 +54,20 @@ local function bytesToNumber(str)
   return number
 end
 
+local function numberToBytes(num, size)
+  local hex = string.format("%x", num)
+  if size and #hex < size*2 then
+    while #hex < size*2 do
+      hex = ("0"..hex)
+    end
+  end
+  local str = ""
+  for i=1, #hex, 2 do
+    str = (str..string.char(tonumber(hex:sub(i,i+1), 16)))
+  end
+  return str:reverse()
+end
+
 ---
 -- BPB Parser, 
 -- Extract the Boot Paramter Block from the disk
@@ -145,6 +159,14 @@ local function getCluster(disk, BPB, index)
   return disk:read(offset + (index * clusterSize), clusterSize)
 end
 
+local function setCluster(disk, BPB, index, data)
+  index = (index-1)
+  local offset = ((BPB.fatSize * BPB.sectorSize * BPB.fatNumber) + (BPB.rootEntriesNumber * 32))
+  local clusterSize = (BPB.sectorSize * BPB.clusterSize)
+  while #data < clusterSize do data = (data.."\0") end
+  return disk:write(offset + (index * clusterSize), data)
+end
+
 local function parseDirectoryEntry(entry)
   local data = {
     name = entry:sub(1, 8),
@@ -170,6 +192,12 @@ local function parseDirectoryEntry(entry)
   end
   data.name = data.name:gsub("\x05", "\xE5") --Seriously, "Y did U do dis"
   return data
+end
+
+local function makeDirectoryEntry(data)
+  local entry = (data.name..data.extension..string.char(data.attributes, data.reserved)..data.createTime..data.createDate..data.accessDate..data.accessTime..data.modificationTime..data.modificationDate)
+  entry = (entry..numberToBytes(data.firstCluster, 4)..numberToBytes(data.size,4))
+  return entry
 end
 
 local function getRootDir(partition)
@@ -275,6 +303,7 @@ function mod.open(partition, path, mode)
   local file = {partition=partition, path=path, mode=mode, aseek=1, vbuff="full", buff="", clusters=clusters, size=details.size}
   
   function file.read(self, pattern)
+    if self.mode:sub(1,1) ~= "r" then return nil, "Write only" end
     if type(pattern) == "number" then
       return getFileBytes(self, pattern)
     elseif pattern == "*a" then
