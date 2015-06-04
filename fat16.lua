@@ -158,17 +158,6 @@ local function listFileClusters(partition, start)
   return clusters
 end
 
-local function searchNextCluster(partition, start)
-  local nextEntry = nil
-  for i=2, (partition.BPB.fatSize*2/partition.BPB.sectorSize) do
-    if searchClusterInFAT(partition.disk, partition.BPB, i) == 0 then
-      nextEntry = i
-      break
-    end
-  end
-  return nextEntry
-end
-
 ---
 -- Get a cluster
 -- Get data from a cluster on the FAT
@@ -277,6 +266,16 @@ end
 
 local function setDir(partition, start, size, entries)
   local clusters = listFileClusters(partition, start)
+  while #entries > (#clusters*partition.BPB.sectorSize*partition.BPB.clusterSize/32) do
+    local nextCluster, err = searchEmptyCluster(partition)
+    if not nextCluster then return nil, err end
+    clusters[#clusters+1] = nextCluster
+  end
+  local clusterSize = (partition.BPB.sectorSize*^partition.BPB.clusterSize)
+  for i=1, #entries do
+    local cluster = clusters[math.floor(i*clusterSize/32)]
+    partition.disk:write((cluster*clusterSize)+(i*32), makeDirectoryEntry(entries[i])
+  end
 end
 
 local function resolvePath(partition, path)
