@@ -107,7 +107,7 @@ local function parseBPB(disk)
 end
 
 ---
--- FAT interface
+-- FAT read interface
 -- Return the value of a FAT entry from it's index
 -- 
 -- @function searchClusterInFAT
@@ -119,6 +119,21 @@ local function searchClusterInFAT(disk, BPB, index)
   if (index < 0) or (index > (BPB.fatSize*BPB.sectorSize/2)) then return nil, "Index out of range" end
   local offset = ((BPB.reservedSectors * BPB.sectorSize))
   return bytesToNumber(disk:read(offset+(index*2), 2))
+end
+
+---
+-- FAT write interface
+-- Set the value of a FAT entry from it's index and a value
+-- 
+-- @function setClusterInFAT
+-- @param #disk disk Disk to set to
+-- @param #fatBPB BPB FAT Infos
+-- @param #number index Index of the entry
+local function setClusterInFAT(disk, BPB, index, value)
+  if (index < 0) or (index > (BPB.fatSize*BPB.sectorSize/2)) then return nil, "Index out of range" end
+  local offset = ((BPB.reservedSectors * BPB.sectorSize))
+  local svalue = numberToBytes(value, 2)
+  return disk:write(offset+(index*2), svalue)
 end
 
 ---
@@ -143,6 +158,17 @@ local function listFileClusters(partition, start)
   return clusters
 end
 
+local function searchNextCluster(partition, start)
+  local nextEntry = nil
+  for i=2, (partition.BPB.fatSize*2/partition.BPB.sectorSize) do
+    if searchClusterInFAT(partition.disk, partition.BPB, i) == 0 then
+      nextEntry = i
+      break
+    end
+  end
+  return nextEntry
+end
+
 ---
 -- Get a cluster
 -- Get data from a cluster on the FAT
@@ -165,6 +191,15 @@ local function setCluster(disk, BPB, index, data)
   local clusterSize = (BPB.sectorSize * BPB.clusterSize)
   while #data < clusterSize do data = (data.."\0") end
   return disk:write(offset + (index * clusterSize), data)
+end
+
+local function searchEmptyCluster(partition)
+  for i=2, (partition.BPB.fatSize*partition.BPB.sectorSize/2) do
+    if searchClusterInFAT(partition.disk, partition.BPB, i) == 0x0000 then
+      return i
+    end
+  end
+  return nil, "FAT Full"
 end
 
 local function parseDirectoryEntry(entry)
@@ -195,8 +230,8 @@ local function parseDirectoryEntry(entry)
 end
 
 local function makeDirectoryEntry(data)
-  local entry = (data.name..data.extension..string.char(data.attributes, data.reserved)..data.createTime..data.createDate..data.accessDate..data.accessTime..data.modificationTime..data.modificationDate)
-  entry = (entry..numberToBytes(data.firstCluster, 4)..numberToBytes(data.size,4))
+  local entry = (data.name:gsub("\xE5", "\x05")..data.extension..string.char(data.attributes, data.reserved)..data.createTime..data.createDate..data.accessDate..data.accessTime..data.modificationTime..data.modificationDate)
+  entry = (entry..numberToBytes(data.firstCluster, 2)..numberToBytes(data.size, 4))
   return entry
 end
 
@@ -213,6 +248,17 @@ local function getRootDir(partition)
   return list
 end
 
+local function setRootDir(partition, entries)
+  if #entries > partition.BPB.rootEntriesNumber then return nil, "Root entries number excessed" end
+  local offset = (partition.BPB.sectorSize * ((partition.BPB.fatSize * partition.BPB.fatNumber) + 1))
+  for i=1, partition.BPB.rootEntriesNumber do
+    if i > #entries then partition.disk:write(offset + (i*32), "\xE5")
+    else
+      partition.disk:write(offset + (i*32), makeDirectoryEntry(entries[i]))
+    end
+  end
+end
+
 local function getDir(partition, start, size)
   local clusters = listFileClusters(partition, start)
   local data = ""
@@ -227,6 +273,10 @@ local function getDir(partition, start, size)
     if err == "End" then break end
   end
   return entries
+end
+
+local function setDir(partition, start, size, entries)
+  local clusters = listFileClusters(partition, start)
 end
 
 local function resolvePath(partition, path)
@@ -266,15 +316,6 @@ local function resolvePath(partition, path)
   end
 end
 
-local function searchEmptyCluster(partition)
-  for i=2, (BPB.fatSize*BPB.sectorSize/2) do
-    if searchClusterInFAT(partition.disk, partition.BPB, i) == 0x0000 then
-      return i
-    end
-  end
-  return nil, "FAT Full"
-end
-
 local function getFileBytes(file, size, stop) --start from file.seek
   if file.aseek >= file.size then return nil, "End of file" end
   if (file.aseek + size) > file.size then size = (size-(file.size-file.aseek)) end
@@ -291,6 +332,10 @@ local function getFileBytes(file, size, stop) --start from file.seek
     file.aseek = (file.aseek+1)
   end
   return buff
+end
+
+local function setFileBytes(file, data)
+  
 end
 
 -- module functions
