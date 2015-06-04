@@ -271,10 +271,10 @@ local function setDir(partition, start, size, entries)
     if not nextCluster then return nil, err end
     clusters[#clusters+1] = nextCluster
   end
-  local clusterSize = (partition.BPB.sectorSize*^partition.BPB.clusterSize)
+  local clusterSize = (partition.BPB.sectorSize*partition.BPB.clusterSize)
   for i=1, #entries do
     local cluster = clusters[math.floor(i*clusterSize/32)]
-    partition.disk:write((cluster*clusterSize)+(i*32), makeDirectoryEntry(entries[i])
+    partition.disk:write((cluster*clusterSize)+(i*32), makeDirectoryEntry(entries[i]))
   end
 end
 
