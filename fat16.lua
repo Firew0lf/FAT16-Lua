@@ -158,6 +158,12 @@ local function listFileClusters(partition, start)
   return clusters
 end
 
+local function setFileClusters(partition, clusters)
+  for i=1, #clusters do
+    setClusterInFAT(partition.disk, partition.BPB, clusters[i], (clusters[i+1] or 0xFFEF))
+  end
+end
+
 ---
 -- Get a cluster
 -- Get data from a cluster on the FAT
@@ -271,6 +277,10 @@ local function setDir(partition, start, size, entries)
     if not nextCluster then return nil, err end
     clusters[#clusters+1] = nextCluster
   end
+  while #entries < (#clusters*partition.BPB.sectorSize*partition.BPB.clusterSize/32) do
+    setClusterInFAT(clusters[#clusters], 0)
+    clusters[#clusters] = nil
+  end
   local clusterSize = (partition.BPB.sectorSize*partition.BPB.clusterSize)
   for i=1, #entries do
     local cluster = clusters[math.floor(i*clusterSize/32)]
@@ -358,7 +368,7 @@ function mod.open(partition, path, mode)
       return (getFileBytes(self, (self.size-self.aseek), "\n").."\n")
     elseif pattern == "*n" then
       getFileBytes(self, (self.size-self.aseek), "[%d]")
-      return getFileBytes(self, (self.size-self.aseek), "[^%d]")
+      return tonumber(getFileBytes(self, (self.size-self.aseek), "[^%d.]"))
     else
       return nil, "Bad pattern"
     end
