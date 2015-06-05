@@ -367,8 +367,14 @@ function mod.open(partition, path, mode)
     elseif pattern == "*L" then
       return (getFileBytes(self, (self.size-self.aseek), "\n").."\n")
     elseif pattern == "*n" then
-      getFileBytes(self, (self.size-self.aseek), "[%d]")
-      return tonumber(getFileBytes(self, (self.size-self.aseek), "[^%d.]"))
+      local n = nil
+      while not n do
+        getFileBytes(self, (self.size-self.aseek), "[%d%-]")
+        local f=getFileBytes(self, (self.size-self.aseek), "[^%d^%.^%-^%e]")
+        print("Found: "..f)
+        n = tonumber(f)
+      end
+      return n
     else
       return nil, "Bad pattern"
     end
