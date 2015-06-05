@@ -371,7 +371,6 @@ function mod.open(partition, path, mode)
       while not n do
         getFileBytes(self, (self.size-self.aseek), "[%d%-]")
         local f=getFileBytes(self, (self.size-self.aseek), "[^%d^%.^%-^%e]")
-        print("Found: "..f)
         n = tonumber(f)
       end
       return n
@@ -380,7 +379,7 @@ function mod.open(partition, path, mode)
     end
   end
   function file.write(self, data)
-  
+    
   end
   function file.seek(self, mode, arg)
     if mode == "set" and type(arg) == "number" then
@@ -400,7 +399,12 @@ function mod.open(partition, path, mode)
     for n,v in pairs(self) do self[n] = nil end
   end
   function file.setvbuff(self, mode)
-  
+    self:flush()
+    if (mode == nil or mode == "full" or mode == "line" or mode == "none") then
+      self.vbuff = (mode or self.vbuff)
+      return self.vbuff
+    end
+    return nil, "Bad buff mode"
   end
   
   return file
