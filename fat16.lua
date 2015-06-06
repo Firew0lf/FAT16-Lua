@@ -357,37 +357,43 @@ function mod.open(partition, path, mode)
   local file = {partition=partition, path=path, mode=mode, aseek=1, vbuff="full", buff="", clusters=clusters, size=details.size}
   
   function file.read(self, pattern)
-    if self.mode:sub(1,1) ~= "r" then return nil, "Write only" end
-    if type(pattern) == "number" then
-      return getFileBytes(self, pattern)
-    elseif pattern == "*a" then
-      return getFileBytes(self, (self.size-self.aseek))
-    elseif pattern == "*l" then
-      return getFileBytes(self, (self.size-self.aseek), "\n")
-    elseif pattern == "*L" then
-      return (getFileBytes(self, (self.size-self.aseek), "\n").."\n")
-    elseif pattern == "*n" then
-      local n = nil
-      while not n do
-        getFileBytes(self, (self.size-self.aseek), "[%d%-]")
-        local f=getFileBytes(self, (self.size-self.aseek), "[^%d^%.^%-^%e]")
-        n = tonumber(f)
+    if self.mode:sub(1,1) == "r" or (self.mode:find("a+") and self.aseek <= self.size) then --read from the disk
+      if type(pattern) == "number" then
+        return getFileBytes(self, pattern)
+      elseif pattern == "*a" then
+        return getFileBytes(self, (self.size-self.aseek))
+      elseif pattern == "*l" then
+        return getFileBytes(self, (self.size-self.aseek), "\n")
+      elseif pattern == "*L" then
+        return (getFileBytes(self, (self.size-self.aseek), "\n").."\n")
+      elseif pattern == "*n" then
+        local n = nil
+        while not n do
+          getFileBytes(self, (self.size-self.aseek), "[%d%-]")
+          local f=getFileBytes(self, (self.size-self.aseek), "[^%d^%.^%-^%e]")
+          n = tonumber(f)
+        end
+        return n
+      else
+        return nil, "Bad pattern"
       end
-      return n
+    elseif self.mode:find("w+") or (self.mode:find("a+") and self.aseek > self.size) then --read from the buffer
+      
     else
-      return nil, "Bad pattern"
+      return nil, "Write only mode"
     end
   end
   function file.write(self, data)
     
   end
   function file.seek(self, mode, arg)
+    if (type(arg) == "number") and arg > (self.size + #self.buff) then return nil, "Number too high" end
     if mode == "set" and type(arg) == "number" then
-      self.seek = arg
+      self.aseek = arg
       return self.seek
     elseif mode == "cur" and type(arg) == "number" then
-      self.seek = (self.seek + arg)
-      return self.seek
+      self.aseek = (self.aseek + arg)
+      return self.aseek
     else
       return nil, "Bad mode"
     end
