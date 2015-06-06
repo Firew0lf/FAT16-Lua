@@ -362,6 +362,12 @@ function mod.open(partition, path, mode)
   
   local file = {partition=partition, path=path, mode=mode, aseek=1, vbuff="full", buff="", clusters=clusters, size=details.size}
   
+  if mode:sub(1,1) == "w" then
+    file.size = 0
+  elseif mode:sub(1,1) == "a" then
+    file.aseek = file.size + 1
+  end
+  
   function file.read(self, pattern)
     if not (self.mode:sub(1,1) == "r" or self.mode:find("+")) then return nil, "Write only mode" end
     if type(pattern) == "number" then
@@ -377,6 +383,7 @@ function mod.open(partition, path, mode)
       while not n do
         getFileBytes(self, (self.size-self.aseek), "[%d%-]")
         local f=getFileBytes(self, (self.size-self.aseek), "[^%d^%.^%-^%e]")
+        if not f then return nil end
         n = tonumber(f)
       end
       return n
@@ -385,7 +392,10 @@ function mod.open(partition, path, mode)
     end
   end
   function file.write(self, data)
-    
+    if file.aseek < file.size then return nil, "Read-only part" end
+    local start = (file.aseek - file.size)
+    self.buff = (self.buff:sub(1,start)..data..self.buff:sub(start+#data,-1))
+    return self
   end
   function file.seek(self, mode, arg)
     if (type(arg) == "number") and arg > (self.size + #self.buff) then return nil, "Number too high" end
