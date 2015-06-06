@@ -364,7 +364,7 @@ function mod.open(partition, path, mode)
   local file = {partition=partition, path=path, mode=mode, aseek=1, vbuff="full", buff="", clusters=clusters, size=details.size}
   
   function file.read(self, pattern)
-    if (self.mode:sub(1,1) == "r" or self.mode:find("+")) then return nil, "Write only mode" end
+    if not (self.mode:sub(1,1) == "r" or self.mode:find("+")) then return nil, "Write only mode" end
     if type(pattern) == "number" then
       return getFileBytes(self, pattern)
     elseif pattern == "*a" then
