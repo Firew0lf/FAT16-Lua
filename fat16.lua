@@ -326,17 +326,24 @@ local function resolvePath(partition, path)
 end
 
 local function getFileBytes(file, size, stop) --start from file.seek
-  if file.aseek >= file.size then return nil, "End of file" end
-  if (file.aseek + size) > file.size then size = (size-(file.size-file.aseek)) end
+  local tsize = (file.size + #file.buff)
+  if file.aseek > (file.size + #file.buff) then return nil, "End of file" end
+  if (file.aseek + size) > tsize then size = (size-(tsize-file.aseek)) end
+  
   local offset =  (file.partition.BPB.sectorSize*((file.partition.BPB.fatSize*file.partition.BPB.fatNumber)+file.partition.BPB.reservedSectors))+(file.partition.BPB.rootEntriesNumber*32)
   local buff = ""
   local clusterSize = (file.partition.BPB.clusterSize * file.partition.BPB.sectorSize)
   
   for i=1, size do
-    local clusterIndex = math.ceil(file.aseek/clusterSize)
-    local cluster = file.clusters[clusterIndex]-2
-    local addr = offset+((clusterSize*cluster)+(file.aseek%clusterSize))
-    buff = (buff..file.partition.disk:read(addr, 1))
+    if file.aseek > (file.size) then --read from the disk
+      local clusterIndex = math.ceil(file.aseek/clusterSize)
+      local cluster = file.clusters[clusterIndex]-2
+      local addr = offset+((clusterSize*cluster)+(file.aseek%clusterSize))
+      buff = (buff..file.partition.disk:read(addr, 1))
+    else --read from the buffer
+      local buffindex = (file.aseek-file.size)
+      buff = (buff..file.buff:sub(buffindex,buffindex))
+    end
     if stop and (buff:sub(-1, -1)):match(stop) then buff=buff:sub(1,-2) break end
     file.aseek = (file.aseek+1)
   end
@@ -357,30 +364,25 @@ function mod.open(partition, path, mode)
   local file = {partition=partition, path=path, mode=mode, aseek=1, vbuff="full", buff="", clusters=clusters, size=details.size}
   
   function file.read(self, pattern)
-    if self.mode:sub(1,1) == "r" or (self.mode:find("a+") and self.aseek <= self.size) then --read from the disk
-      if type(pattern) == "number" then
-        return getFileBytes(self, pattern)
-      elseif pattern == "*a" then
-        return getFileBytes(self, (self.size-self.aseek))
-      elseif pattern == "*l" then
-        return getFileBytes(self, (self.size-self.aseek), "\n")
-      elseif pattern == "*L" then
-        return (getFileBytes(self, (self.size-self.aseek), "\n").."\n")
-      elseif pattern == "*n" then
-        local n = nil
-        while not n do
-          getFileBytes(self, (self.size-self.aseek), "[%d%-]")
-          local f=getFileBytes(self, (self.size-self.aseek), "[^%d^%.^%-^%e]")
-          n = tonumber(f)
-        end
-        return n
-      else
-        return nil, "Bad pattern"
+    if (self.mode:sub(1,1) == "r" or self.mode:find("+")) then return nil, "Write only mode" end
+    if type(pattern) == "number" then
+      return getFileBytes(self, pattern)
+    elseif pattern == "*a" then
+      return getFileBytes(self, (self.size-self.aseek))
+    elseif pattern == "*l" then
+      return getFileBytes(self, (self.size-self.aseek), "\n")
+    elseif pattern == "*L" then
+      return (getFileBytes(self, (self.size-self.aseek), "\n").."\n")
+    elseif pattern == "*n" then
+      local n = nil
+      while not n do
+        getFileBytes(self, (self.size-self.aseek), "[%d%-]")
+        local f=getFileBytes(self, (self.size-self.aseek), "[^%d^%.^%-^%e]")
+        n = tonumber(f)
       end
-    elseif self.mode:find("w+") or (self.mode:find("a+") and self.aseek > self.size) then --read from the buffer
-      
+      return n
     else
-      return nil, "Write only mode"
+      return nil, "Bad pattern"
     end
   end
   function file.write(self, data)
@@ -399,7 +401,7 @@ function mod.open(partition, path, mode)
     end
   end
   function file.flush(self)
-  
+    
   end
   function file.close(self)
     for n,v in pairs(self) do self[n] = nil end
