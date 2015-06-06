@@ -327,15 +327,14 @@ end
 
 local function getFileBytes(file, size, stop) --start from file.seek
   local tsize = (file.size + #file.buff)
-  if file.aseek > (file.size + #file.buff) then return nil, "End of file" end
+  if file.aseek > (tsize) then return nil, "End of file" end
   if (file.aseek + size) > tsize then size = (size-(tsize-file.aseek)) end
-  
   local offset =  (file.partition.BPB.sectorSize*((file.partition.BPB.fatSize*file.partition.BPB.fatNumber)+file.partition.BPB.reservedSectors))+(file.partition.BPB.rootEntriesNumber*32)
   local buff = ""
   local clusterSize = (file.partition.BPB.clusterSize * file.partition.BPB.sectorSize)
   
   for i=1, size do
-    if file.aseek > (file.size) then --read from the disk
+    if file.aseek <= (file.size) then --read from the disk
       local clusterIndex = math.ceil(file.aseek/clusterSize)
       local cluster = file.clusters[clusterIndex]-2
       local addr = offset+((clusterSize*cluster)+(file.aseek%clusterSize))
