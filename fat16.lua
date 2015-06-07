@@ -339,7 +339,7 @@ local function getFileBytes(file, size, stop) --start from file.seek
       local cluster = file.clusters[clusterIndex]-2
       local addr = offset+((clusterSize*cluster)+(file.aseek%clusterSize))
       buff = (buff..file.partition.disk:read(addr, 1))
-    else --read from the buffer
+    else --read from the file buffer
       local buffindex = (file.aseek-file.size)
       buff = (buff..file.buff:sub(buffindex,buffindex))
     end
@@ -373,7 +373,7 @@ function mod.open(partition, path, mode)
     if type(pattern) == "number" then
       return getFileBytes(self, pattern)
     elseif pattern == "*a" then
-      return getFileBytes(self, (self.size-self.aseek))
+      return getFileBytes(self, (self.size-self.aseek+#file.buff))
     elseif pattern == "*l" then
       return getFileBytes(self, (self.size-self.aseek), "\n")
     elseif pattern == "*L" then
@@ -400,14 +400,13 @@ function mod.open(partition, path, mode)
   function file.seek(self, mode, arg)
     if (type(arg) == "number") and arg > (self.size + #self.buff) then return nil, "Number too high" end
     if mode == "set" and type(arg) == "number" then
-      self.aseek = arg
-      return self.seek
+      self.aseek = arg+1
     elseif mode == "cur" and type(arg) == "number" then
       self.aseek = (self.aseek + arg)
-      return self.aseek
     else
       return nil, "Bad mode"
     end
+    return self.aseek-1
   end
   function file.flush(self)
     
